@@ -51,8 +51,8 @@ auto matrix_multiprication_cuda(const T* A, const T* B, T* C, const size_t m, co
 
     dim3 threads_per_block = {32, 32};
     dim3 blocks_per_grid = {1, 1};
-    blocks_per_grid.x = (int)std::ceil(static_cast<double>(p) / threads_per_block.x);
-    blocks_per_grid.y = (int)std::ceil(static_cast<double>(m) / threads_per_block.y);
+    blocks_per_grid.x = static_cast<int>(std::ceil(static_cast<double>(p) / threads_per_block.x));
+    blocks_per_grid.y = static_cast<int>(std::ceil(static_cast<double>(m) / threads_per_block.y));
 
     // std::cout << blocks_per_grid.x << ", " << blocks_per_grid.y << std::endl;
     // std::cout << threads_per_block.x << ", " << threads_per_block.y << std::endl;
