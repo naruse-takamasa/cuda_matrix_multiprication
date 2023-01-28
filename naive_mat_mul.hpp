@@ -20,7 +20,7 @@ auto matrix_multiprication_naive(const T* A, const T* B, T* C, const size_t m, c
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    auto elapsed_time = static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count());
+    auto elapsed_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
 
     return elapsed_time;
 }

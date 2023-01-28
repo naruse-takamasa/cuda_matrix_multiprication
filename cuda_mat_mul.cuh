@@ -1,3 +1,6 @@
+#ifndef _CUDA_MAT_MUL_
+#define _CUDA_MAT_MUL_
+
 #include <iostream>
 #include <cstdlib>
 #include <vector>
@@ -65,7 +68,9 @@ auto matrix_multiprication_cuda(const T* A, const T* B, T* C, const size_t m, co
     cudaFree(device_C);
 
     auto end = std::chrono::high_resolution_clock::now();
-    auto elapsed_time = static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count());
+    auto elapsed_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
 
     return elapsed_time;
 }
+
+#endif

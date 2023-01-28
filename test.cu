@@ -71,7 +71,9 @@ void test()
 {
     constexpr size_t n = 300;
 
-    for (size_t i = n; i < 2 * n; i++)
+    std::cout << "size,naive,cuda" << std::endl;
+
+    for (size_t i = 1; i < 2 * n; i++)
     {
         std::vector<double> naive_elapsed_time_list;
         std::vector<double> cuda_elapsed_time_list;
@@ -106,7 +108,7 @@ void test()
         std::sort(naive_elapsed_time_list.begin(), naive_elapsed_time_list.end());
         std::sort(cuda_elapsed_time_list.begin(), cuda_elapsed_time_list.end());
 
-        std::cout << naive_elapsed_time_list[2] << "," << cuda_elapsed_time_list[2] << std::endl;
+        std::cout << i << "," << naive_elapsed_time_list[2] << "," << cuda_elapsed_time_list[2] << std::endl;
     }
 }
 
@@ -114,5 +116,5 @@ int main()
 {
     print_device_information();
 
-    test<int>();
+    test<uint8_t>();
 }
