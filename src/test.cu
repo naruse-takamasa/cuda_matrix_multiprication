@@ -20,11 +20,17 @@ void print_device_information()
 }
 
 template<typename T>
-void print_matrix(const std::vector<T> &vec)
+void print_matrix(const std::vector<T> &vec, const size_t height, const size_t width)
 {
-    for (auto i : vec)
+    size_t idx = 0;
+
+    for (size_t i = 0; i < height; i++)
     {
-        std::cerr << std::setprecision(10) << i << " ";
+        for (size_t j = 0; j < width; j++)
+        {
+            std::cerr << vec.at(idx++) << " ";
+        }
+        std::cerr << std::endl;
     }
     std::cerr << std::endl;
 }
@@ -34,7 +40,7 @@ void set_random_number(std::vector<T> &A, std::vector<T> &B)
 {
     std::random_device seed_gen;
     std::mt19937 engine(seed_gen());
-    std::uniform_real_distribution<> dist1(-10., 10.);
+    std::uniform_real_distribution<> dist1(-10., 10);
 
     for (size_t i = 0; i < A.size(); i++)
     {
@@ -58,7 +64,9 @@ bool check_result(std::vector<T> &naive_C, std::vector<T> &cuda_C)
     {
         if (std::abs(naive_C.at(i) - cuda_C.at(i)) > eps)
         {
-            std::cerr << i << std::endl;
+            std::cerr << "index:" << i << std::endl;
+            std::cerr << naive_C.at(i) << ", " << cuda_C.at(i) << std::endl;
+
             return false;
         }
     }
@@ -69,14 +77,15 @@ bool check_result(std::vector<T> &naive_C, std::vector<T> &cuda_C)
 template<typename T>
 void test()
 {
-    constexpr size_t n = 300;
+    constexpr size_t n = 5000;
 
-    std::cout << "size,naive,cuda" << std::endl;
+    std::cout << "size,naive,cuda,cuda-shared" << std::endl;
 
-    for (size_t i = 1; i < 2 * n; i++)
+    for (size_t i = 1; i < 2 * n; i += 500)
     {
         std::vector<double> naive_elapsed_time_list;
         std::vector<double> cuda_elapsed_time_list;
+        std::vector<double> cuda_shared_elapsed_time_list;
 
         std::vector<T> A(i * i);
         std::vector<T> B(i * i);
@@ -89,32 +98,38 @@ void test()
             auto naive_elapsed_time = matrix_multiprication_naive(A.data(), B.data(), naive_C.data(), i, i, i);
 
             std::vector<T> cuda_C(i * i);
-            auto cuda_elapsed_time = matrix_multiprication_cuda(A.data(), B.data(), cuda_C.data(), i, i, i);
+            auto cuda_elapsed_time = matrix_multiprication_cuda<T, false>(A.data(), B.data(), cuda_C.data(), i, i, i);
 
-            if (!check_result(naive_C, cuda_C))
+            std::vector<T> cuda_shared_C(i * i);
+            auto cuda_shared_elapsed_time = matrix_multiprication_cuda<T, true>(A.data(), B.data(), cuda_shared_C.data(), i, i, i);
+
+            if (!check_result(naive_C, cuda_shared_C))
             {
                 std::cout << "Result failed." << std::endl;
-                std::cerr << "naive : ";
-                print_matrix(naive_C);
-                std::cerr << "cuda :  ";
-                print_matrix(cuda_C);
+                // std::cerr << "naive : \n";
+                // print_matrix(naive_C, i);
+                // std::cerr << "cuda :  \n";
+                // print_matrix(cuda_shared_C, i);
                 return;
             }
 
             naive_elapsed_time_list.push_back(naive_elapsed_time);
             cuda_elapsed_time_list.push_back(cuda_elapsed_time);
+            cuda_shared_elapsed_time_list.push_back(cuda_shared_elapsed_time);
         }
 
         std::sort(naive_elapsed_time_list.begin(), naive_elapsed_time_list.end());
         std::sort(cuda_elapsed_time_list.begin(), cuda_elapsed_time_list.end());
+        std::sort(cuda_shared_elapsed_time_list.begin(), cuda_shared_elapsed_time_list.end());
 
-        std::cout << i << "," << naive_elapsed_time_list[2] << "," << cuda_elapsed_time_list[2] << std::endl;
+        std::cout << i << "," << naive_elapsed_time_list.at(2) << "," << cuda_elapsed_time_list.at(2) <<"," << cuda_shared_elapsed_time_list.at(2) << std::endl;
+        std::cerr << i << " ok" << std::endl;
     }
 }
 
 int main()
 {
-    print_device_information();
+    // print_device_information();
 
-    test<uint8_t>();
+    test<int16_t>();
 }
