@@ -6,20 +6,8 @@
 #include <vector>
 #include <chrono>
 
-// #define ERROR_CHECK(call)                                                   /
-// {                                                                           /
-//     const cudaError_t error = call;                                         /
-//     if (error != cudaSuccess)                                               /
-//     {                                                                       /
-//         std::cerr << "Error: " << __FILE__ << ":" << __LINE__ << std::endl; /
-//         std::cerr << "Code: " << error << ", reason: "                      /
-//             << cudaGetErrorString(error) << std::endl;                      /
-//         std::exit(EXIT_FAILURE);                                            /
-//     }                                                                       /
-// }
-
 template<typename T>
-__global__ void matrix_multiprication_kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+__global__ void matrix_multiplication_kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
     size_t i = blockIdx.y * blockDim.y + threadIdx.y;
     size_t j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -39,7 +27,7 @@ __global__ void matrix_multiprication_kernel(const T* A, const T* B, T* C, const
 }
 
 template<typename T>
-__global__ void matrix_multiprication_shared_kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+__global__ void matrix_multiplication_shared_kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
     size_t x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -92,7 +80,7 @@ __global__ void matrix_multiprication_shared_kernel(const T* A, const T* B, T* C
 }
 
 template<typename T, bool shared_mode>
-auto matrix_multiprication_cuda(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+auto matrix_multiplication_cuda(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
     auto begin = std::chrono::high_resolution_clock::now();
 
@@ -109,16 +97,13 @@ auto matrix_multiprication_cuda(const T* A, const T* B, T* C, const size_t m, co
     blocks_per_grid.x = static_cast<int>(std::ceil(static_cast<double>(p) / threads_per_block.x));
     blocks_per_grid.y = static_cast<int>(std::ceil(static_cast<double>(m) / threads_per_block.y));
 
-    // std::cout << blocks_per_grid.x << ", " << blocks_per_grid.y << std::endl;
-    // std::cout << threads_per_block.x << ", " << threads_per_block.y << std::endl;
-
     if constexpr (shared_mode)
     {
-        matrix_multiprication_shared_kernel<<<blocks_per_grid, threads_per_block>>>(device_A, device_B, device_C, m, n, p);
+        matrix_multiplication_shared_kernel<<<blocks_per_grid, threads_per_block>>>(device_A, device_B, device_C, m, n, p);
     }
     else
     {
-        matrix_multiprication_kernel<<<blocks_per_grid, threads_per_block>>>(device_A, device_B, device_C, m, n, p);
+        matrix_multiplication_kernel<<<blocks_per_grid, threads_per_block>>>(device_A, device_B, device_C, m, n, p);
     }
 
     cudaDeviceSynchronize();

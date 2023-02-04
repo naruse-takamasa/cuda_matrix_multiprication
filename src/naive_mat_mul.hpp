@@ -4,7 +4,7 @@
 #include <chrono>
 
 template<typename T>
-auto matrix_multiprication_naive(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+auto matrix_multiplication_naive(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
     auto begin = std::chrono::high_resolution_clock::now();
 
