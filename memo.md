@@ -2,7 +2,7 @@
 
 ## はじめに
 
-SIMD に続いて GPGPU にもあまり馴染みがないので、触ってみたかった。
+GPGPU にもあまり馴染みがないので、触ってみたかった。
 お題は「行列積」
 
 ## naive
@@ -24,19 +24,20 @@ for (size_t i = 0; i < m; i++)
 
 環境：手持ちの AMD Ryzen 7 7700X 8Core
 
-size = 2000
-time = 4455630[micro sec]
+size = 2000 * 2000
+time = 4338260[micro sec]
 
-3590962445.2658772[FLOPS] = 3.6[MFLOPS]
+3688114589.7203026[FLOPS] = 3.69[GFLOPS]
 
-## CUDA 使うと
+## CUDA を使う
+
+host から device に情報を送って、各スレッドに色々計算させる。
+ブロックのサイズやらグリッドのサイズやらはひとまず放置。
 
 ```c
 template<typename T>
-auto matrix_multiplication_cuda(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+void matrix_multiplication(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
-    auto begin = std::chrono::high_resolution_clock::now();
-
     T *device_A, *device_B, *device_C;
     cudaMalloc(&device_A, sizeof(T) * m * n);
     cudaMalloc(&device_B, sizeof(T) * n * p);
@@ -45,12 +46,10 @@ auto matrix_multiplication_cuda(const T* A, const T* B, T* C, const size_t m, co
     cudaMemcpy(device_A, A, sizeof(T) * m * n, cudaMemcpyHostToDevice);
     cudaMemcpy(device_B, B, sizeof(T) * n * p, cudaMemcpyHostToDevice);
 
-    dim3 threads_per_block = {32, 32};
-    dim3 blocks_per_grid = {1, 1};
-    blocks_per_grid.x = static_cast<int>(std::ceil(static_cast<double>(p) / threads_per_block.x));
-    blocks_per_grid.y = static_cast<int>(std::ceil(static_cast<double>(m) / threads_per_block.y));
+    dim3 threads_per_block = {?, ?};
+    dim3 blocks_per_grid = {?, ?};
 
-    matrix_multiplication_kernel<<<blocks_per_grid, threads_per_block>>>(device_A, device_B, device_C, m, n, p);
+    kernel<<<blocks_per_grid, threads_per_block>>>(device_A, device_B, device_C, m, n, p);
 
     cudaDeviceSynchronize();
 
@@ -59,20 +58,55 @@ auto matrix_multiplication_cuda(const T* A, const T* B, T* C, const size_t m, co
     cudaFree(device_A);
     cudaFree(device_B);
     cudaFree(device_C);
-
-    auto end = std::chrono::high_resolution_clock::now();
-    auto elapsed_time = static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
-
-    return elapsed_time;
 }
 ```
-host から device に情報を送る。
-各スレッドで行列積の1要素分の計算をする。
-カーネルはこんな感じ。
+
+## 1スレッドに全部解かせる
+
+```c
+kernel<<<{1, 1}, {1, 1}>>>(device_A, device_B, device_C, m, n, p);
+```
+
+として、1 つのスレッドに行列積を解いてもらう。
 
 ```c
 template<typename T>
-__global__ void matrix_multiplication_kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+__global__ void kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+{
+    for (size_t i = 0; i < m; i++)
+    {
+        for (size_t j = 0; j < p; j++)
+        {
+            for (size_t k = 0; k < n; k++)
+            {
+                C[i * p + j] += A[i * n + k] * B[k * p + j];
+            }
+        }
+    }
+}
+```
+
+### 性能
+
+環境：NVIDIA GeForce RTX 3060 Ti
+
+size = 500 * 500
+time = 6324170[micro sec]
+
+39530879.150939964[FLOPS] = 39.53[MFLOPS]
+
+CPU のときより性能が低い。
+
+## 1 スレッドが 1 要素分だけ解く
+
+各スレッドで行列積の1要素分の計算をする。
+カーネルは自分の担当する要素の結果だけを計算。
+
+何も考えずにブロックのサイズを`{32, 32}` にして計算してみる。
+
+```c
+template<typename T>
+__global__ void kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
     size_t i = blockIdx.y * blockDim.y + threadIdx.y;
     size_t j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -94,35 +128,41 @@ __global__ void matrix_multiplication_kernel(const T* A, const T* B, T* C, const
 
 環境：NVIDIA GeForce RTX 3060 Ti
 
-size = 2000^3 * 2
-time = 192594[micro sec]
+size = 2000 * 2000
+time = 29576[micro sec]
 
-83076315980.76784[flops] = 83[MFLOPS]
+540979172301.86633[FLOPS] = 540.98[GFLOPS]
 
-すごい増えた。すごい。
+大分性能が上がった。
 
-## shared memory
+### ブロックのサイズについて
 
-shared memory を意識して書くともっと速くなると聞いた。
+適当にブロックのサイズをいじってみた。
+- `{32, 16}` だと 24812 [micro sec]
+- `{1024, 1}` だと 37734
+- `{512, 2}` だと 29710
+
+## shared memory を意識する
+
+shared memory を意識して書くともっと速くなるという情報を得たのでやってみたくなった。
 
 どういう風に計算するかというと、、、
 TODO: 図
 
 
 ```c
-template<typename T>
-__global__ void matrix_multiplication_shared_kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+__global__ void kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
     size_t y = blockIdx.y * blockDim.y + threadIdx.y;
     size_t x = blockIdx.x * blockDim.x + threadIdx.x;
 
     T result = 0;
 
+    __shared__ T sub_matrix_A[32][32];
+    __shared__ T sub_matrix_B[32][32];
+
     for (size_t i = 0; i < n / blockDim.x; i++)
     {
-        __shared__ T sub_matrix_A[32][32];
-        __shared__ T sub_matrix_B[32][32];
-
         sub_matrix_A[threadIdx.y][threadIdx.x] = A[y * n + blockDim.x * i + threadIdx.x];
         sub_matrix_B[threadIdx.y][threadIdx.x] = B[(blockDim.y * i + threadIdx.y) * p + x];
 
@@ -136,16 +176,22 @@ __global__ void matrix_multiplication_shared_kernel(const T* A, const T* B, T* C
         __syncthreads();
     }
 
-    for (size_t i = n / blockDim.x; i < (n + blockDim.x - 1) / blockDim.x; i++)
+    if (n % blockDim.x != 0)
     {
-        __shared__ T sub_matrix_A[32][32];
-        __shared__ T sub_matrix_B[32][32];
+        size_t i = n / blockDim.x;
 
-        if (y * n + blockDim.x * i + threadIdx.x < n * m)
+        sub_matrix_A[threadIdx.y][threadIdx.x] = 0;
+        sub_matrix_B[threadIdx.y][threadIdx.x] = 0;
+
+        if (y * n + blockDim.x * i + threadIdx.x < m * n)
+        {
             sub_matrix_A[threadIdx.y][threadIdx.x] = A[y * n + blockDim.x * i + threadIdx.x];
+        }
 
-        if ((blockDim.y * i + threadIdx.y) * p + x < m * p)
+        if ((blockDim.y * i + threadIdx.y) * p + x < n * p)
+        {
             sub_matrix_B[threadIdx.y][threadIdx.x] = B[(blockDim.y * i + threadIdx.y) * p + x];
+        }
 
         __syncthreads();
 
@@ -167,21 +213,25 @@ __global__ void matrix_multiplication_shared_kernel(const T* A, const T* B, T* C
 
 環境：NVIDIA GeForce RTX 3060 Ti
 
-size = 2000^3 * 2
-time = 23478[micro sec]
+size = 2000 * 2000
+time = 23828[micro sec]
 
-681489053582.0769[flops] = 681[MFLOPS]
+671478932348.4976[FLOPS] = 671.48[GFLOPS]
 
-うわ、すごい増えた。すごい。
+確かに増えた。
 
 ## 感想
 
 - ちゃんと性能が高くなったという意味では成功
-- SIMD
+  - 1スレッド分の性能は CPU 以下っぽいということも分かった
+- shared memory 使う方は端数処理で少しハマった
+- block のサイズをいろいろ変えると速度に大きな影響を与えることは実験中に知った
+  - けど、具体的にどんな値にすると速いとかは分かってないし、まだ試せていないのでまた今度やる
 
 ## 参考
 
 - http://www.slis.tsukuba.ac.jp/~fujisawa.makoto.fu/cgi-bin/wiki/?CUDA%A4%C7%B9%D4%CE%F3%B1%E9%BB%BB%A1%A7%BE%E8%BB%BB%28%A5%B7%A5%A7%A5%A2%A1%BC%A5%C9%A5%E1%A5%E2%A5%EA%BB%C8%CD%D1%C8%C7%29
 - https://www.slideshare.net/ssuserf87701/2015gpgpu9-59179722
+- https://www.slideshare.net/ssuserf87701/2015gpgpu10-59179759
 - http://www.butsuri.it-chiba.ac.jp/~yasutake/matter/tominaga.pdf
 - https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/

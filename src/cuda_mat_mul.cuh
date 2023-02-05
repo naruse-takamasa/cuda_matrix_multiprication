@@ -7,14 +7,27 @@
 #include <chrono>
 
 template<typename T>
+__global__ void matrix_multiplication_cuda_naive(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
+{
+    for (size_t i = 0; i < m; i++)
+    {
+        for (size_t j = 0; j < p; j++)
+        {
+            for (size_t k = 0; k < n; k++)
+            {
+                C[i * p + j] += A[i * n + k] * B[k * p + j];
+            }
+        }
+    }
+}
+
+template<typename T>
 __global__ void matrix_multiplication_kernel(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
     size_t i = blockIdx.y * blockDim.y + threadIdx.y;
     size_t j = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (i >= m || j >= p) return;
-
-    // printf("(%ld, %ld) : (%d, %d, %d), (%d, %d, %d)\n", i, j, blockIdx.y, blockDim.y, threadIdx.y, blockIdx.x, blockDim.x, threadIdx.x);
 
     T result = 0;
 
@@ -34,11 +47,11 @@ __global__ void matrix_multiplication_shared_kernel(const T* A, const T* B, T* C
 
     T result = 0;
 
+    __shared__ T sub_matrix_A[32][32];
+    __shared__ T sub_matrix_B[32][32];
+
     for (size_t i = 0; i < n / blockDim.x; i++)
     {
-        __shared__ T sub_matrix_A[32][32];
-        __shared__ T sub_matrix_B[32][32];
-
         sub_matrix_A[threadIdx.y][threadIdx.x] = A[y * n + blockDim.x * i + threadIdx.x];
         sub_matrix_B[threadIdx.y][threadIdx.x] = B[(blockDim.y * i + threadIdx.y) * p + x];
 
@@ -52,16 +65,22 @@ __global__ void matrix_multiplication_shared_kernel(const T* A, const T* B, T* C
         __syncthreads();
     }
 
-    for (size_t i = n / blockDim.x; i < (n + blockDim.x - 1) / blockDim.x; i++)
+    if (n % blockDim.x != 0)
     {
-        __shared__ T sub_matrix_A[32][32];
-        __shared__ T sub_matrix_B[32][32];
+        size_t i = n / blockDim.x;
 
-        if (y * n + blockDim.x * i + threadIdx.x < n * m)
+        sub_matrix_A[threadIdx.y][threadIdx.x] = 0;
+        sub_matrix_B[threadIdx.y][threadIdx.x] = 0;
+
+        if (y * n + blockDim.x * i + threadIdx.x < m * n)
+        {
             sub_matrix_A[threadIdx.y][threadIdx.x] = A[y * n + blockDim.x * i + threadIdx.x];
+        }
 
-        if ((blockDim.y * i + threadIdx.y) * p + x < m * p)
+        if ((blockDim.y * i + threadIdx.y) * p + x < n * p)
+        {
             sub_matrix_B[threadIdx.y][threadIdx.x] = B[(blockDim.y * i + threadIdx.y) * p + x];
+        }
 
         __syncthreads();
 
@@ -79,7 +98,7 @@ __global__ void matrix_multiplication_shared_kernel(const T* A, const T* B, T* C
     }
 }
 
-template<typename T, bool shared_mode>
+template<typename T, int mode>
 auto matrix_multiplication_cuda(const T* A, const T* B, T* C, const size_t m, const size_t n, const size_t p)
 {
     auto begin = std::chrono::high_resolution_clock::now();
@@ -97,13 +116,17 @@ auto matrix_multiplication_cuda(const T* A, const T* B, T* C, const size_t m, co
     blocks_per_grid.x = static_cast<int>(std::ceil(static_cast<double>(p) / threads_per_block.x));
     blocks_per_grid.y = static_cast<int>(std::ceil(static_cast<double>(m) / threads_per_block.y));
 
-    if constexpr (shared_mode)
+    if constexpr (mode == 2)
     {
         matrix_multiplication_shared_kernel<<<blocks_per_grid, threads_per_block>>>(device_A, device_B, device_C, m, n, p);
     }
-    else
+    else if constexpr (mode == 1)
     {
         matrix_multiplication_kernel<<<blocks_per_grid, threads_per_block>>>(device_A, device_B, device_C, m, n, p);
+    }
+    else
+    {
+        matrix_multiplication_cuda_naive<<<{1, 1}, {1, 1}>>>(device_A, device_B, device_C, m, n, p);
     }
 
     cudaDeviceSynchronize();
