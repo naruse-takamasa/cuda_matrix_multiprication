@@ -275,6 +275,56 @@ deviceQuery, CUDA Driver = CUDART, CUDA Driver Version = 11.8, CUDA Runtime Vers
 Result = PASS
 ```
 
+```
+lscpu
+アーキテクチャ:                        x86_64
+  CPU 操作モード:                      32-bit, 64-bit
+  Address sizes:                       48 bits physical, 48 bits virtual
+  バイト順序:                          Little Endian
+CPU:                                   16
+  オンラインになっている CPU のリスト: 0-15
+ベンダー ID:                           AuthenticAMD
+  モデル名:                            AMD Ryzen 7 7700X 8-Core Processor
+    CPU ファミリー:                    25
+    モデル:                            97
+    コアあたりのスレッド数:            2
+    ソケットあたりのコア数:            8
+    ソケット数:                        1
+    ステッピング:                      2
+    BogoMIPS:                          8999.81
+    フラグ:                            fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush m
+                                       mx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep
+                                       _good nopl tsc_reliable nonstop_tsc cpuid extd_apicid pni pclmulqdq ssse3 fma cx1
+                                       6 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_leg
+                                       acy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext ssbd ibrs ibp
+                                       b stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed
+                                        adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt x
+                                       savec xgetbv1 xsaves avx512_bf16 clzero xsaveerptr arat npt nrip_save tsc_scale v
+                                       mcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx51
+                                       2vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpo
+                                       pcntdq rdpid fsrm
+Virtualization features:
+  仮想化:                              AMD-V
+  ハイパーバイザのベンダー:            Microsoft
+  仮想化タイプ:                        完全仮想化
+Caches (sum of all):
+  L1d:                                 256 KiB (8 instances)
+  L1i:                                 256 KiB (8 instances)
+  L2:                                  8 MiB (8 instances)
+  L3:                                  32 MiB (1 instance)
+Vulnerabilities:
+  Itlb multihit:                       Not affected
+  L1tf:                                Not affected
+  Mds:                                 Not affected
+  Meltdown:                            Not affected
+  Spec store bypass:                   Mitigation; Speculative Store Bypass disabled via prctl and seccomp
+  Spectre v1:                          Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+  Spectre v2:                          Mitigation; Full AMD retpoline, IBPB conditional, IBRS_FW, STIBP conditional, RSB
+                                        filling
+  Srbds:                               Not affected
+  Tsx async abort:                     Not affected
+```
+
 ## 参考
 
 - http://www.slis.tsukuba.ac.jp/~fujisawa.makoto.fu/cgi-bin/wiki/?CUDA%A4%C7%B9%D4%CE%F3%B1%E9%BB%BB%A1%A7%BE%E8%BB%BB%28%A5%B7%A5%A7%A5%A2%A1%BC%A5%C9%A5%E1%A5%E2%A5%EA%BB%C8%CD%D1%C8%C7%29
